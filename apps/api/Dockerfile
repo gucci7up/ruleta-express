@@ -14,7 +14,7 @@ RUN pnpm turbo build --filter=api
 
 FROM node:20-alpine AS runner
 WORKDIR /app
-RUN npm install -g pnpm
+RUN npm install -g pnpm prisma@5.22.0
 COPY --from=builder /app/apps/api/dist ./dist
 COPY --from=builder /app/apps/api/package.json ./
 COPY --from=builder /app/apps/api/prisma ./prisma
