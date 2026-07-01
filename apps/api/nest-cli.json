@@ -4,6 +4,8 @@
   "sourceRoot": "src",
   "compilerOptions": {
     "deleteOutDir": true,
-    "plugins": ["@nestjs/swagger"]
+    "builder": "webpack",
+    "webpackConfigPath": "webpack.config.js",
+    "typeCheck": true
   }
 }

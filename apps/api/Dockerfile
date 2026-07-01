@@ -1,8 +1,8 @@
-FROM node:20-alpine AS base
+FROM node:20-slim AS base
 RUN npm install -g pnpm turbo
+RUN apt-get update && apt-get install -y openssl python3 make g++ && rm -rf /var/lib/apt/lists/*
 
 FROM base AS builder
-RUN apk add --no-cache openssl
 WORKDIR /app
 COPY package.json pnpm-workspace.yaml turbo.json ./
 COPY apps/api/package.json ./apps/api/
@@ -11,17 +11,16 @@ RUN pnpm install --no-frozen-lockfile
 COPY packages/shared ./packages/shared
 COPY apps/api ./apps/api
 RUN pnpm --filter api exec prisma generate --schema=./prisma/schema.prisma
-RUN cd apps/api && pnpm exec nest build
-RUN ls /app/apps/api/dist/main.js
+RUN cd apps/api && pnpm exec nest build 2>&1
+RUN test -f /app/apps/api/dist/main.js && echo "BUILD OK: dist/main.js exists"
 
 FROM node:20-slim AS runner
 WORKDIR /app
-RUN npm install -g pnpm prisma@5.22.0
+RUN npm install -g prisma@5.22.0
+RUN apt-get update && apt-get install -y openssl wget && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/apps/api/dist /app/dist
-COPY --from=builder /app/apps/api/package.json ./
 COPY --from=builder /app/apps/api/prisma ./prisma
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
-RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
 EXPOSE 3000
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss --skip-generate && node /app/dist/main.js"]
+CMD ["sh", "-c", "prisma db push --accept-data-loss --skip-generate && node /app/dist/main.js"]
