@@ -4,7 +4,7 @@ WORKDIR /app
 COPY package.json pnpm-workspace.yaml turbo.json ./
 COPY apps/admin/package.json ./apps/admin/
 COPY packages/shared/package.json ./packages/shared/
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 COPY packages/shared ./packages/shared
 COPY apps/admin ./apps/admin
 ENV VITE_API_URL=__VITE_API_URL__
