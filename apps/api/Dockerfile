@@ -11,7 +11,7 @@ RUN pnpm install --no-frozen-lockfile
 COPY packages/shared ./packages/shared
 COPY apps/api ./apps/api
 RUN pnpm --filter api exec prisma generate --schema=./prisma/schema.prisma
-RUN pnpm turbo build --filter=api
+RUN cd apps/api && pnpm exec nest build
 RUN ls /app/apps/api/dist/main.js
 
 FROM node:20-slim AS runner
