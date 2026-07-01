@@ -9,7 +9,7 @@ COPY packages/shared/package.json ./packages/shared/
 RUN pnpm install --no-frozen-lockfile
 COPY packages/shared ./packages/shared
 COPY apps/api ./apps/api
-RUN npx prisma generate --schema=./apps/api/prisma/schema.prisma
+RUN pnpm --filter api exec prisma generate --schema=./prisma/schema.prisma
 RUN pnpm turbo build --filter=api
 
 FROM node:20-alpine AS runner
