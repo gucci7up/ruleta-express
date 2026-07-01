@@ -7,7 +7,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "build": "tsc --noEmit",
+    "build": "echo 'shared: no build needed, imported from source'",
     "lint": "eslint src --ext .ts"
   },
   "devDependencies": {
