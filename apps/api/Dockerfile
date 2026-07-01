@@ -2,7 +2,7 @@ FROM node:20-alpine AS base
 RUN npm install -g pnpm turbo
 
 FROM base AS builder
-RUN apk add --no-cache openssl1.1-compat
+RUN apk add --no-cache openssl
 WORKDIR /app
 COPY package.json pnpm-workspace.yaml turbo.json ./
 COPY apps/api/package.json ./apps/api/
@@ -21,6 +21,6 @@ COPY --from=builder /app/apps/api/package.json ./
 COPY --from=builder /app/apps/api/prisma ./prisma
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
-RUN apk add --no-cache wget openssl1.1-compat
+RUN apk add --no-cache wget openssl
 EXPOSE 3000
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
