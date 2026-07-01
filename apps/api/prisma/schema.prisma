@@ -1,0 +1,280 @@
+// This is your Prisma schema file
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ──────────────────────────────────────────────────────────
+// ENUMS
+// ──────────────────────────────────────────────────────────
+
+enum RoundStatus {
+  OPEN
+  CLOSED
+  DRAWING
+  FINISHED
+}
+
+enum TicketStatus {
+  PENDING
+  WINNER
+  LOSER
+  CANCELLED
+  PAID
+}
+
+enum BetType {
+  NUMBER
+  COLOR
+}
+
+enum UserRole {
+  SUPERADMIN
+  ADMIN
+  SUPERVISOR
+  OPERATOR
+}
+
+// ──────────────────────────────────────────────────────────
+// COLORES (parametrizado en DB)
+// ──────────────────────────────────────────────────────────
+
+model Color {
+  id      Int    @id @default(autoincrement())
+  name    String @unique // VERDE | ROJO | NEGRO
+  hex     String
+
+  numbers  NumberColor[]
+  payouts  Payout[]
+  winners  WinningNumber[]
+
+  @@map("colors")
+}
+
+// Mapping número 0-18 → color (parametrizado, nunca en código)
+model NumberColor {
+  number  Int   @id // 0-18
+  colorId Int
+  color   Color @relation(fields: [colorId], references: [id])
+
+  @@map("number_colors")
+}
+
+// ──────────────────────────────────────────────────────────
+// TABLA DE PAGOS (parametrizado en DB)
+// ──────────────────────────────────────────────────────────
+
+model Payout {
+  id          Int     @id @default(autoincrement())
+  type        BetType
+  reference   String  // "0"-"18" para NUMBER | "ROJO","NEGRO","VERDE" para COLOR
+  multiplier  Decimal @db.Decimal(10, 2)
+  colorId     Int?    // opcional, para relación con color cuando type=COLOR
+  color       Color?  @relation(fields: [colorId], references: [id])
+  isActive    Boolean @default(true)
+  description String?
+
+  @@unique([type, reference])
+  @@map("payouts")
+}
+
+// ──────────────────────────────────────────────────────────
+// ESTRUCTURA DE NEGOCIO
+// ──────────────────────────────────────────────────────────
+
+model Branch {
+  id        Int       @id @default(autoincrement())
+  name      String
+  address   String?
+  phone     String?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  terminals   Terminal[]
+  rounds      Round[]
+  users       User[]
+  cashClosings CashClosing[]
+
+  @@map("branches")
+}
+
+model Terminal {
+  id        Int      @id @default(autoincrement())
+  name      String
+  branchId  Int
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tickets      Ticket[]
+  users        User[]
+  cashClosings CashClosing[]
+
+  @@map("terminals")
+}
+
+model User {
+  id         Int      @id @default(autoincrement())
+  name       String
+  email      String   @unique
+  password   String
+  pin        String?  // PIN hasheado para login rápido en POS
+  role       UserRole @default(OPERATOR)
+  branchId   Int?
+  branch     Branch?  @relation(fields: [branchId], references: [id])
+  terminalId Int?
+  terminal   Terminal? @relation(fields: [terminalId], references: [id])
+  isActive   Boolean  @default(true)
+  lastLoginAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tickets    Ticket[]
+  auditLogs  AuditLog[]
+  cashClosings CashClosing[]
+
+  @@map("users")
+}
+
+// ──────────────────────────────────────────────────────────
+// RONDAS
+// ──────────────────────────────────────────────────────────
+
+model Round {
+  id        Int         @id @default(autoincrement())
+  status    RoundStatus @default(OPEN)
+  branchId  Int
+  branch    Branch      @relation(fields: [branchId], references: [id])
+  openAt    DateTime
+  closeAt   DateTime
+  drawAt    DateTime
+  finishAt  DateTime?
+  createdAt DateTime    @default(now())
+
+  winningNumber WinningNumber?
+  tickets       Ticket[]
+
+  @@index([status, branchId])
+  @@index([closeAt])
+  @@index([drawAt])
+  @@map("rounds")
+}
+
+model WinningNumber {
+  id      Int      @id @default(autoincrement())
+  roundId Int      @unique
+  round   Round    @relation(fields: [roundId], references: [id])
+  number  Int      // 0-18
+  colorId Int
+  color   Color    @relation(fields: [colorId], references: [id])
+  drawnAt DateTime @default(now())
+
+  @@map("winning_numbers")
+}
+
+// ──────────────────────────────────────────────────────────
+// TICKETS Y APUESTAS
+// ──────────────────────────────────────────────────────────
+
+model Ticket {
+  id          Int          @id @default(autoincrement())
+  uuid        String       @unique @default(uuid())
+  roundId     Int
+  round       Round        @relation(fields: [roundId], references: [id])
+  terminalId  Int
+  terminal    Terminal     @relation(fields: [terminalId], references: [id])
+  userId      Int
+  user        User         @relation(fields: [userId], references: [id])
+  status      TicketStatus @default(PENDING)
+  totalBet    Decimal      @db.Decimal(10, 2)
+  totalPrize  Decimal      @default(0) @db.Decimal(10, 2)
+  printedAt   DateTime?
+  cancelledAt DateTime?
+  paidAt      DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  items Ticket_Item[]
+
+  @@index([roundId])
+  @@index([terminalId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("tickets")
+}
+
+model Ticket_Item {
+  id        Int     @id @default(autoincrement())
+  ticketId  Int
+  ticket    Ticket  @relation(fields: [ticketId], references: [id])
+  type      BetType
+  reference String  // "5" | "ROJO" | "NEGRO" | "VERDE"
+  amount    Decimal @db.Decimal(10, 2)
+  isWinner  Boolean?
+  prize     Decimal @default(0) @db.Decimal(10, 2)
+
+  @@map("ticket_items")
+}
+
+// ──────────────────────────────────────────────────────────
+// CAJA
+// ──────────────────────────────────────────────────────────
+
+model CashClosing {
+  id          Int      @id @default(autoincrement())
+  terminalId  Int
+  terminal    Terminal @relation(fields: [terminalId], references: [id])
+  branchId    Int
+  branch      Branch   @relation(fields: [branchId], references: [id])
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  openAmount  Decimal  @db.Decimal(10, 2)
+  closeAmount Decimal  @db.Decimal(10, 2)
+  salesTotal  Decimal  @db.Decimal(10, 2)
+  prizesTotal Decimal  @db.Decimal(10, 2)
+  netTotal    Decimal  @db.Decimal(10, 2) // salesTotal - prizesTotal
+  date        DateTime @default(now())
+  notes       String?
+
+  @@index([terminalId, date])
+  @@map("cash_closings")
+}
+
+// ──────────────────────────────────────────────────────────
+// CONFIGURACIÓN GLOBAL
+// ──────────────────────────────────────────────────────────
+
+model Setting {
+  key         String  @id
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("settings")
+}
+
+// ──────────────────────────────────────────────────────────
+// AUDITORÍA
+// ──────────────────────────────────────────────────────────
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  action    String   // CREATE_TICKET | CANCEL_TICKET | CLOSE_ROUND | etc.
+  entity    String
+  entityId  String?
+  data      Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([entity, entityId])
+  @@map("audit_logs")
+}

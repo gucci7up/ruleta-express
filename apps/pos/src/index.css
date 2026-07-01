@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    @apply bg-gray-950 text-white;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+}
+
+@layer utilities {
+  .touch-btn {
+    @apply min-h-[52px] min-w-[52px] cursor-pointer select-none active:scale-95 transition-transform duration-100;
+  }
+  .number-cell {
+    @apply flex flex-col items-center justify-center rounded-xl font-bold text-white
+           transition-all duration-150 cursor-pointer border-2 border-transparent
+           active:scale-95 touch-btn;
+  }
+  .number-cell.selected {
+    @apply border-yellow-400 ring-2 ring-yellow-400/50 scale-95;
+  }
+}
+
+/* Print styles — oculta todo excepto el ticket */
+@media print {
+  body * { visibility: hidden; }
+  #print-ticket, #print-ticket * { visibility: visible; }
+  #print-ticket {
+    position: fixed;
+    top: 0; left: 0;
+    width: 80mm;
+  }
+}
